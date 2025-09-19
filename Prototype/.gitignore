@@ -2,6 +2,10 @@
 *.apk
 *.aab
 *.aar
+*.ap_
+*.dex
+*.class
+*.so
 
 # Files for the Android Emulator
 .emulator_console_auth_token
@@ -9,25 +13,30 @@
 # Gradle files
 .gradle/
 build/
+app/build/
+gradle.properties
 local.properties
-.DS_Store
-**/.idea/workspace.xml
-**/.idea/tasks.xml
-**/.idea/gradle.xml
-**/.idea/libraries/
-**/.idea/navEditor.xml
-.idea/assetWizardPaths.xml
-.idea/codeStyles/Project.xml
-!**/.idea/codeStyles/
-!**/.idea/scopes/
+/gradle-wrapper/gradle-wrapper.jar
+
+# IntelliJ/Android Studio files
+.idea/
+.idea/runConfigurations/
+.idea/deployment.xml
+.idea/shelf/
 .idea/caches/
 .idea/libraries/
 .idea/modules.xml
 .idea/vcs.xml
 .idea/jarRepositories.xml
-
-# IntelliJ/Android Studio files
-.idea/
+.idea/assetWizardPaths.xml
+.idea/codeStyles/Project.xml
+.idea/codeStyles/
+.idea/scopes/
+.idea/workspace.xml
+.idea/tasks.xml
+.idea/gradle.xml
+.idea/navEditor.xml
+.idea/deployment.xml
 captures/
 .externalNativeBuild/
 .cxx/
@@ -40,6 +49,7 @@ captures/
 .classpath
 .project
 Thumbs.db
+*.iml
 
 # Keystore files
 *.jks
@@ -49,16 +59,16 @@ release.keystore
 # Local test results
 /app/build/test-results/
 /test-results/
+/test-results/debug/
 
 # Log files
 *.log
+crashlytics.properties
 
-# Other
-**/.idea/
-**/.gradle/
-*.iml
-*.iws
-*.ipr
+# Other temporary files
+*.swp
+*.bak
+*.swo
 
 # Exclude local build output directories
 **/build/
@@ -70,11 +80,11 @@ release.keystore
 # Exclude Android specific files
 lint-results.xml
 lint-results.html
+lint-baseline.xml
 
 # Exclude debug keystore
 debug.keystore
 
-# Exclude temp files
-*.swp
-*.bak
-*.swo
+# Firebase Crashlytics specific files
+firebase-debug.log
+firebase-release.log

@@ -16,7 +16,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -30,7 +29,7 @@ import com.gladden.skillsyncai.AuthViewModel.AuthViewModelFactory // <-- Keep th
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun LoginScreen(onLoginSuccess: () -> Unit) {
+fun LoginScreen() {
     val viewModel: AuthViewModel = viewModel(
         factory = AuthViewModelFactory(LocalContext.current.applicationContext as Application)
     )
@@ -64,7 +63,6 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                // Main heading text color is changed to a darker color
                 Text(
                     text = if (isLoginMode) "Welcome Back!" else "Create Account",
                     fontSize = 28.sp,
@@ -74,7 +72,6 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                // OutlinedTextField text and label colors are changed for better visibility
                 OutlinedTextField(
                     value = email,
                     onValueChange = { viewModel.onEmailChange(it) },
@@ -122,7 +119,7 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
                 if (errorMessage != null) {
                     Text(
                         text = errorMessage!!,
-                        color = Color.Red, // Error message color changed to red for better contrast
+                        color = Color.Red,
                         modifier = Modifier.padding(top = 8.dp)
                     )
                 }
@@ -132,7 +129,7 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
                 Button(
                     onClick = {
                         if (isLoginMode) {
-                            viewModel.loginUser(onLoginSuccess)
+                            viewModel.loginUser()
                         } else {
                             viewModel.registerUser()
                         }
@@ -150,12 +147,21 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                // TextButton text color is changed to a darker color
                 TextButton(onClick = { viewModel.toggleMode() }) {
                     Text(
                         text = if (isLoginMode) "Don't have an account? Register" else "Already have an account? Login",
                         color = Color.DarkGray
                     )
+                }
+
+                // Add the Forgot Password button
+                if (isLoginMode) {
+                    TextButton(onClick = { viewModel.sendPasswordResetEmail() }) {
+                        Text(
+                            text = "Forgot Password?",
+                            color = Color.DarkGray
+                        )
+                    }
                 }
             }
         }
@@ -167,6 +173,6 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
 @Composable
 fun LoginScreenPreview() {
     SkillSyncAITheme {
-        LoginScreen(onLoginSuccess = {})
+        LoginScreen()
     }
 }

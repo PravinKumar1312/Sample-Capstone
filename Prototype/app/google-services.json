@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "444017293564",
+    "project_id": "skillsync-ai-dc4ee",
+    "storage_bucket": "skillsync-ai-dc4ee.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:444017293564:android:db330f88a6402f35afbf79",
+        "android_client_info": {
+          "package_name": "com.gladden.skillsyncai"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCEYOD4f6MJV6LBOaVCWOjLRbwZriie0iY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

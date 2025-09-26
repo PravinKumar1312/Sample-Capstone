@@ -8,10 +8,10 @@
             <InsightsFilterSettings>
               <option name="connection">
                 <ConnectionSetting>
-                  <option name="appId" value="PLACEHOLDER" />
-                  <option name="mobileSdkAppId" value="" />
-                  <option name="projectId" value="" />
-                  <option name="projectNumber" value="" />
+                  <option name="appId" value="com.gladden.skillsyncai" />
+                  <option name="mobileSdkAppId" value="1:444017293564:android:db330f88a6402f35afbf79" />
+                  <option name="projectId" value="skillsync-ai-dc4ee" />
+                  <option name="projectNumber" value="444017293564" />
                 </ConnectionSetting>
               </option>
               <option name="signal" value="SIGNAL_UNSPECIFIED" />

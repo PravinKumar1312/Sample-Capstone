@@ -1,14 +1,10 @@
+// settings.gradle.kts
+
 pluginManagement {
     repositories {
-        google {
-            content {
-                includeGroupByRegex("com\\.android.*")
-                includeGroupByRegex("com\\.google.*")
-                includeGroupByRegex("androidx.*")
-            }
-        }
-        mavenCentral()
         gradlePluginPortal()
+        google() // This is now a regular, unrestricted repository
+        mavenCentral()
     }
 }
 dependencyResolutionManagement {

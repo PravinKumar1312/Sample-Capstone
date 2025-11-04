@@ -3,99 +3,124 @@ package com.gladden.skillsyncai
 import android.app.Application
 import android.content.Context
 import android.net.Uri
-import androidx.lifecycle.AndroidViewModel
-import androidx.lifecycle.LiveData
-import androidx.lifecycle.MutableLiveData
-import androidx.lifecycle.ViewModel
-import androidx.lifecycle.ViewModelProvider
-import androidx.lifecycle.application
+import android.util.Log
+import androidx.lifecycle.*
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.FirebaseAuthInvalidCredentialsException
+import com.google.firebase.auth.FirebaseAuthUserCollisionException
 import com.google.firebase.auth.ktx.auth
 import com.google.firebase.ktx.Firebase
 import java.io.File
 import java.io.FileOutputStream
+import androidx.core.content.edit
+
+// Tag for logging to help debug crashes related to file I/O
+private const val TAG = "AuthViewModel"
 
 class AuthViewModel(application: Application) : AndroidViewModel(application) {
 
-    // SharedPreferences for local data storage (Image URI)
     private val sharedPrefs = application.getSharedPreferences("local_user_data", Context.MODE_PRIVATE)
+    private val auth: FirebaseAuth by lazy { Firebase.auth }
 
-    // We'll use this LiveData to track if the user is logged in
+    // LiveData for Auth State
     private val _isLoggedIn = MutableLiveData<Boolean>()
     val isLoggedIn: LiveData<Boolean> = _isLoggedIn
 
+    // Authentication UI State
     private val _isLoginMode = MutableLiveData(true)
     val isLoginMode: LiveData<Boolean> = _isLoginMode
-
     private val _email = MutableLiveData("")
     val email: LiveData<String> = _email
-
     private val _password = MutableLiveData("")
     val password: LiveData<String> = _password
-
     private val _errorMessage = MutableLiveData<String?>(null)
     val errorMessage: LiveData<String?> = _errorMessage
 
-    // LiveData to hold the current user's email for display in UserDetailsScreen
+    // User State
     private val _currentUserName = MutableLiveData<String?>(null)
     val currentUserName: LiveData<String?> = _currentUserName
 
-    // LiveData to hold the local profile image URI, loaded from SharedPreferences on startup
+    // User Details (Loaded from SharedPreferences)
     private val _profileImageUri = MutableLiveData<String?>(
         sharedPrefs.getString("profile_image_uri", null)
     )
     val profileImageUri: LiveData<String?> = _profileImageUri
 
-    // FIX: Use 'lazy' to initialize FirebaseAuth only when it is first accessed.
-    private val auth: FirebaseAuth by lazy { Firebase.auth }
+    private val _userNameDetail = MutableLiveData<String?>(sharedPrefs.getString("user_name_detail", null))
+    val userNameDetail: LiveData<String?> = _userNameDetail
+
+    private val _userAgeDetail = MutableLiveData<String?>(sharedPrefs.getString("user_age_detail", null))
+    val userAgeDetail: LiveData<String?> = _userAgeDetail
+
+    private val _userSkillsDetail = MutableLiveData<String?>(sharedPrefs.getString("user_skills_detail", null))
+    val userSkillsDetail: LiveData<String?> = _userSkillsDetail
+
+    private val _userLocationDetail = MutableLiveData<String?>(sharedPrefs.getString("user_location_detail", null))
+    val userLocationDetail: LiveData<String?> = _userLocationDetail
+
 
     init {
-        // Check if a user is already signed in on app launch
+        // --- FIX FOR LOGIN SKIP CLARIFICATION ---
+        // PROBLEM 1: This correctly identifies a persistent Firebase session.
+        // If you want to see the Login screen, you MUST use the Logout button or clear app data.
         _isLoggedIn.value = (auth.currentUser != null)
-        // If a user is logged in, set their email for display
         _currentUserName.value = auth.currentUser?.email
+        Log.d(TAG, "Initial Auth State: Logged In: ${_isLoggedIn.value}, User: ${auth.currentUser?.uid}")
     }
+
+    // --- Core Authentication Methods ---
 
     fun onEmailChange(newEmail: String) {
         _email.value = newEmail
-        _errorMessage.value = null
+        clearErrorMessage()
     }
 
     fun onPasswordChange(newPassword: String) {
         _password.value = newPassword
-        _errorMessage.value = null
+        clearErrorMessage()
     }
 
     fun toggleMode() {
         _isLoginMode.value = !_isLoginMode.value!!
-        // Clear fields when toggling between login and register
         _email.value = ""
         _password.value = ""
-        _errorMessage.value = null
+        clearErrorMessage()
     }
 
-    fun registerUser() {
+    fun registerUser(name: String, age: String, skills: String) {
         if (email.value.isNullOrBlank() || password.value.isNullOrBlank()) {
-            _errorMessage.value = "Please fill all fields"
+            setErrorMessage("Please enter both email and password.")
             return
         }
 
         auth.createUserWithEmailAndPassword(email.value!!, password.value!!)
             .addOnCompleteListener { task ->
                 if (task.isSuccessful) {
-                    _errorMessage.value = "Registration successful! Please log in."
+                    saveLocalUserDetails(
+                        name = name.ifBlank { "User" },
+                        age = age.ifBlank { "N/A" },
+                        skills = skills.ifBlank { "Beginner" },
+                        location = "Unknown"
+                    )
+
+                    setErrorMessage("Registration successful! Please log in.")
                     _isLoginMode.value = true
-                    _email.value = "" // Clear fields on successful registration
+                    _email.value = ""
                     _password.value = ""
                 } else {
-                    _errorMessage.value = task.exception?.message ?: "Registration failed."
+                    Log.e(TAG, "Registration failed: ", task.exception)
+                    setErrorMessage(when (task.exception) {
+                        is FirebaseAuthUserCollisionException -> "This email is already in use."
+                        is FirebaseAuthInvalidCredentialsException -> "The email address is badly formatted."
+                        else -> task.exception?.message ?: "Registration failed."
+                    })
                 }
             }
     }
 
     fun loginUser() {
         if (email.value.isNullOrBlank() || password.value.isNullOrBlank()) {
-            _errorMessage.value = "Please fill all fields"
+            setErrorMessage("Please fill both email and password fields.")
             return
         }
 
@@ -103,54 +128,24 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
             .addOnCompleteListener { task ->
                 if (task.isSuccessful) {
                     _isLoggedIn.value = true
-                    // Set current user email on successful login
                     _currentUserName.value = auth.currentUser?.email
+                    Log.d(TAG, "Login successful for user: ${auth.currentUser?.uid}")
+
+                    // Ensure default local details exist on login if they were cleared
+                    if (sharedPrefs.getString("user_name_detail", null).isNullOrBlank()) {
+                        saveLocalUserDetails(
+                            name = auth.currentUser?.email ?: "User",
+                            age = "N/A",
+                            skills = "Beginner",
+                            location = "Unknown"
+                        )
+                    }
                 } else {
-                    _errorMessage.value = task.exception?.message ?: "Login failed."
-                }
-            }
-    }
-
-    // CORRECTED: Function to copy the content URI to a local file and save the new URI
-    fun saveProfileImageUri(uri: Uri) {
-        // 1. Create a file in the app's private files directory
-        val timeStamp = System.currentTimeMillis()
-        val destinationFile = File(application.filesDir, "profile_image_$timeStamp.jpg")
-
-        try {
-            // 2. Open an InputStream for the temporary content URI
-            application.contentResolver.openInputStream(uri)?.use { inputStream ->
-                // 3. Open an OutputStream for the new local file
-                FileOutputStream(destinationFile).use { outputStream ->
-                    // 4. Copy the data (the actual "upload" to local storage)
-                    inputStream.copyTo(outputStream)
-                }
-            }
-
-            // 5. Get the permanent local file URI and save it to SharedPreferences
-            val localFileUri = destinationFile.toURI().toString()
-            sharedPrefs.edit().putString("profile_image_uri", localFileUri).apply()
-            _profileImageUri.value = localFileUri
-            _errorMessage.value = "Profile image updated."
-
-        } catch (e: Exception) {
-            // Handle errors like permission failure, IO errors, etc.
-            _errorMessage.value = "Failed to save image: ${e.message}"
-        }
-    }
-
-    fun sendPasswordResetEmail() {
-        if (email.value.isNullOrBlank()) {
-            _errorMessage.value = "Please enter your email to reset the password."
-            return
-        }
-
-        auth.sendPasswordResetEmail(email.value!!)
-            .addOnCompleteListener { task ->
-                if (task.isSuccessful) {
-                    _errorMessage.value = "Password reset email sent. Check your inbox."
-                } else {
-                    _errorMessage.value = task.exception?.message ?: "Failed to send reset email."
+                    Log.e(TAG, "Login failed: ", task.exception)
+                    setErrorMessage(when (task.exception) {
+                        is FirebaseAuthInvalidCredentialsException -> "Invalid email or password. Please try again."
+                        else -> task.exception?.message ?: "Login failed."
+                    })
                 }
             }
     }
@@ -159,27 +154,134 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
         auth.signOut()
         _isLoggedIn.value = false
         _currentUserName.value = null
+        clearErrorMessage()
+        Log.d(TAG, "User signed out.")
     }
 
-    // MODIFIED: Generic success message applied after a successful email update.
+    override fun onCleared() {
+        super.onCleared()
+        signOut()
+    }
+
+    // --- User Details & Image Handlers (FIXES FOR PROFILE CRASH) ---
+
+    // Function to save all details (used only for registration/initial setup)
+    fun saveLocalUserDetails(name: String?, age: String, skills: String, location: String) {
+        sharedPrefs.edit().apply {
+            putString("user_name_detail", name)
+            putString("user_age_detail", age)
+            putString("user_skills_detail", skills)
+            putString("user_location_detail", location)
+            apply()
+        }
+
+        // Update LiveData to reflect changes immediately
+        _userNameDetail.value = name
+        _userAgeDetail.value = age
+        _userSkillsDetail.value = skills
+        _userLocationDetail.value = location
+
+        if (_errorMessage.value?.contains("failed") != true) {
+            setErrorMessage("Local user details saved.")
+        }
+    }
+
+    // ⭐ FIX: Individual setters used by UserDetailsScreen to save data upon editing.
+    fun setUserNameDetail(name: String?) {
+        _userNameDetail.value = name
+        sharedPrefs.edit { putString("user_name_detail", name) }
+    }
+
+    fun setUserAgeDetail(age: String?) {
+        _userAgeDetail.value = age
+        sharedPrefs.edit { putString("user_age_detail", age) }
+    }
+
+    fun setUserSkillsDetail(skills: String?) {
+        _userSkillsDetail.value = skills
+        sharedPrefs.edit { putString("user_skills_detail", skills) }
+    }
+
+    fun setUserLocationDetail(location: String?) {
+        _userLocationDetail.value = location
+        sharedPrefs.edit { putString("user_location_detail", location) }
+    }
+    // ⭐ END FIX: Individual setters
+
+    // Function to handle local image saving (where the crash is likely occurring)
+    fun saveProfileImageUri(uri: Uri) {
+        val timeStamp = System.currentTimeMillis()
+        val destinationFile = File(application.filesDir, "profile_image_$timeStamp.jpg")
+
+        try {
+            // Use application.contentResolver to safely open the input stream from the URI
+            application.contentResolver.openInputStream(uri)?.use { inputStream ->
+                FileOutputStream(destinationFile).use { outputStream ->
+                    inputStream.copyTo(outputStream)
+                }
+            }
+
+            // Store the URI string of the file saved locally in the app's internal storage
+            val localFileUri = destinationFile.toURI().toString()
+            sharedPrefs.edit { putString("profile_image_uri", localFileUri) }
+            _profileImageUri.value = localFileUri
+            setErrorMessage("Profile image updated successfully.")
+            Log.d(TAG, "Image saved successfully to: $localFileUri")
+
+        } catch (e: Exception) {
+            // CRASH DEBUG: Log the full stack trace if file I/O fails (often due to permissions)
+            Log.e(TAG, "FATAL IMAGE SAVE ERROR: Check Manifest Permissions", e)
+            setErrorMessage("Failed to save image. Check Logcat (FATAL IMAGE SAVE ERROR) and Manifest permissions.")
+        }
+    }
+
+    fun sendPasswordResetEmail() {
+        if (email.value.isNullOrBlank()) {
+            setErrorMessage("Please enter your email to reset the password.")
+            return
+        }
+
+        auth.sendPasswordResetEmail(email.value!!)
+            .addOnCompleteListener { task ->
+                if (task.isSuccessful) {
+                    setErrorMessage("Password reset email sent. Check your inbox.")
+                } else {
+                    Log.e(TAG, "Password reset failed: ", task.exception)
+                    setErrorMessage(task.exception?.message ?: "Failed to send reset email.")
+                }
+            }
+    }
+
+    // --- Message Management Methods ---
+
+    // MODIFIED: Improved error handling for email update
     fun updateEmail(newEmail: String) {
         val user = auth.currentUser
         if (user != null && newEmail.isNotBlank()) {
             user.updateEmail(newEmail)
                 .addOnCompleteListener { task ->
                     if (task.isSuccessful) {
-                        _currentUserName.value = user.email // Update LiveData immediately
-                        _errorMessage.value = "User details updated successfully."
+                        _currentUserName.value = user.email
+                        setErrorMessage("Email updated successfully. You may need to sign in again soon.")
                     } else {
-                        _errorMessage.value = task.exception?.message ?: "Failed to update email. Re-login may be required."
+                        Log.e(TAG, "Email update failed: ", task.exception)
+                        // This often fails if the user hasn't logged in recently (requires re-authentication)
+                        setErrorMessage("Failed to update email. Please sign out, sign back in immediately, and try again.")
                     }
                 }
         } else {
-            _errorMessage.value = "Please enter a valid email."
+            setErrorMessage("Invalid email provided for update.")
         }
     }
 
-    // NEW SIMULATION FUNCTION: To be called when non-email fields are updated
+    fun clearErrorMessage() {
+        _errorMessage.value = null
+    }
+
+    fun setErrorMessage(message: String) {
+        _errorMessage.value = message
+    }
+
     fun simulateLocalUpdateSuccess() {
         _errorMessage.value = "User details updated successfully."
     }
